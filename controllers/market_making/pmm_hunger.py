@@ -102,7 +102,7 @@ class PMMHungerController(MarketMakingControllerBase):
             interval=self.config.interval,
             max_records=self.max_records,
         )
-        natr = ta.natr(candles["high"], candles["low"], candles["close"], length=self.config.natr_length) / 100
+        natr = ta.natr(candles["high"], candles["low"], candles["close"], length=self.config.natr_length) * 2 / 100
         reference_price = self.market_data_provider.get_price_by_type(
             self.config.connector_name, self.config.trading_pair, PriceType.MidPrice
         )

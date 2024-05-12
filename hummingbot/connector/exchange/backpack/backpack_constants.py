@@ -10,24 +10,24 @@ MAX_ORDER_ID_LEN = 32
 REST_URL = "https://api.backpack.{}"
 WSS_URL = "wss://ws.backpack.{}"
 
-PUBLIC_API_VERSION = "v1"
-PRIVATE_API_VERSION = "v1"
+API_PREFIX_V1 = "/api/v1"
+W_API_PREFIX_V1 = "/wapi/v1"
 
 # Public API endpoints or BinanceClient function
-TICKER_PRICE_CHANGE_PATH_URL = "/ticker/24hr"
-TICKER_BOOK_PATH_URL = "/ticker/bookTicker"
-EXCHANGE_INFO_PATH_URL = "/exchangeInfo"
-PING_PATH_URL = "/ping"
-SNAPSHOT_PATH_URL = "/depth"
-SERVER_TIME_PATH_URL = "/time"
+TICKER_PRICE_CHANGE_PATH_URL = f"{API_PREFIX_V1}/ticker"
+TICKER_BOOK_PATH_URL = f"{API_PREFIX_V1}/tickers"
+EXCHANGE_INFO_PATH_URL = f"{API_PREFIX_V1}/markets"
+PING_PATH_URL = f"{API_PREFIX_V1}/ping"
+SNAPSHOT_PATH_URL = f"{API_PREFIX_V1}/depth"
+SERVER_TIME_PATH_URL = f"{API_PREFIX_V1}/time"
 
 # Private API endpoints or BinanceClient function
-ACCOUNTS_PATH_URL = "/account"
-MY_TRADES_PATH_URL = "/myTrades"
-ORDER_PATH_URL = "/order"
+ACCOUNTS_PATH_URL = f"{API_PREFIX_V1}/capital"
+MY_TRADES_PATH_URL = f"{W_API_PREFIX_V1}/history/fills"
+ORDER_PATH_URL = f"{API_PREFIX_V1}/order"
 BINANCE_USER_STREAM_PATH_URL = "/userDataStream"
 
-WS_HEARTBEAT_TIME_INTERVAL = 30
+WS_HEARTBEAT_TIME_INTERVAL = 60
 
 # Binance params
 

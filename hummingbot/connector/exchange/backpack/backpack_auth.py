@@ -1,9 +1,11 @@
-import hashlib
-import hmac
+import base64
 from collections import OrderedDict
 from typing import Any, Dict, Tuple
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
+from cryptography.hazmat.primitives.asymmetric import ed25519
+
+import hummingbot.connector.exchange.backpack.backpack_constants as CONSTANTS
 from hummingbot.connector.time_synchronizer import TimeSynchronizer
 from hummingbot.core.web_assistant.auth import AuthBase
 from hummingbot.core.web_assistant.connections.data_types import RESTMethod, RESTRequest, WSRequest
@@ -12,7 +14,7 @@ from hummingbot.core.web_assistant.connections.data_types import RESTMethod, RES
 class BackpackAuth(AuthBase):
     def __init__(self, api_key: str, secret_key: str, time_provider: TimeSynchronizer):
         self.api_key = api_key
-        self.secret_key = secret_key
+        self.secret_key = ed25519.Ed25519PrivateKey.from_private_bytes(base64.b64decode(secret_key))
         self.time_provider = time_provider
 
     async def rest_authenticate(self, request: RESTRequest) -> RESTRequest:
@@ -39,16 +41,16 @@ class BackpackAuth(AuthBase):
 
         :return: a dictionary with headers
         """
-        signature, timestamp = self._sign_payload(request)
+        signature, timestamp, window = self._sign_payload(request)
 
         return {
-            "X-Timestamp": timestamp,
-            "X-Window": request.headers.get("X-Window", 5000),
+            "X-Timestamp": str(timestamp),
+            "X-Window": str(window),
             "X-API-Key": self.api_key,
             "X-Signature": signature,
         }
 
-    def _sign_payload(self, request: RESTRequest) -> Tuple[str, int]:
+    def _sign_payload(self, request: RESTRequest) -> Tuple[str, int, int]:
         """
         To generate a signature perform the following: https://docs.backpack.exchange/#section/Authentication/Signing-requests
 
@@ -57,7 +59,7 @@ class BackpackAuth(AuthBase):
         instruction = self._get_instruction(request)
         params = self._get_sorted_params(request)
         timestamp = int(self.time_provider.time() * 1e3)
-        window = request.headers.get("X-Window", 5000)
+        window = request.headers.get("X-Window", 5000) if type(request.headers) is dict else 5000
 
         message = f"timestamp={timestamp}&window={window}"
         if params:
@@ -65,12 +67,9 @@ class BackpackAuth(AuthBase):
         if instruction:
             message = f"instruction={instruction}&{message}"
 
-        # This message should be signed using the private key of the ED25519 keypair
-        # that corresponds to the public key in the X-API-Key header. The signature
-        # should then be base64 encoded and submitted in the X-Signature header.
-        signature = hmac.new(self.secret_key.encode("utf-8"), message.encode("utf-8"), hashlib.sha256).hexdigest()
+        signature = base64.b64encode(self.secret_key.sign(message.encode())).decode()
 
-        return signature, timestamp
+        return signature, timestamp, window
 
     def _get_instruction(self, request: RESTRequest) -> str:
         """
@@ -79,21 +78,21 @@ class BackpackAuth(AuthBase):
         :return: the instruction in str
         """
         instruction_mapping = {
-            (RESTMethod.GET, "/api/v1/capital"): "balanceQuery",
-            (RESTMethod.GET, "/wapi/v1/capital/deposit/address"): "depositAddressQuery",
-            (RESTMethod.GET, "/wapi/v1/capital/deposits"): "depositQueryAll",
-            (RESTMethod.GET, "/wapi/v1/history/fills"): "fillHistoryQueryAll",
-            (RESTMethod.DELETE, "/api/v1/order"): "orderCancel",
-            (RESTMethod.DELETE, "/api/v1/orders"): "orderCancelAll",
-            (RESTMethod.POST, "/api/v1/order"): "orderExecute",
-            (RESTMethod.GET, "/wapi/v1/history/orders"): "orderHistoryQueryAll",
-            (RESTMethod.GET, "/api/v1/order"): "orderQuery",
-            (RESTMethod.GET, "/api/v1/orders"): "orderQueryAll",
-            (RESTMethod.POST, "/wapi/v1/capital/withdrawals"): "withdraw",
-            (RESTMethod.GET, "/wapi/v1/capital/withdrawals"): "orderTest",
+            (RESTMethod.GET, f"{CONSTANTS.API_PREFIX_V1}/capital"): "balanceQuery",
+            (RESTMethod.GET, f"{CONSTANTS.W_API_PREFIX_V1}/capital/deposit/address"): "depositAddressQuery",
+            (RESTMethod.GET, f"{CONSTANTS.W_API_PREFIX_V1}/capital/deposits"): "depositQueryAll",
+            (RESTMethod.GET, f"{CONSTANTS.W_API_PREFIX_V1}/history/fills"): "fillHistoryQueryAll",
+            (RESTMethod.DELETE, f"{CONSTANTS.API_PREFIX_V1}/order"): "orderCancel",
+            (RESTMethod.DELETE, f"{CONSTANTS.API_PREFIX_V1}/orders"): "orderCancelAll",
+            (RESTMethod.POST, f"{CONSTANTS.API_PREFIX_V1}/order"): "orderExecute",
+            (RESTMethod.GET, f"{CONSTANTS.W_API_PREFIX_V1}/history/orders"): "orderHistoryQueryAll",
+            (RESTMethod.GET, f"{CONSTANTS.API_PREFIX_V1}/order"): "orderQuery",
+            (RESTMethod.GET, f"{CONSTANTS.API_PREFIX_V1}/orders"): "orderQueryAll",
+            (RESTMethod.POST, f"{CONSTANTS.W_API_PREFIX_V1}/capital/withdrawals"): "withdraw",
+            (RESTMethod.GET, f"{CONSTANTS.W_API_PREFIX_V1}/capital/withdrawals"): "orderTest",
         }
 
-        request_key = (request.method, request.path)
+        request_key = (request.method, urlparse(request.url).path)
         return instruction_mapping.get(request_key, "")
 
     def _get_sorted_params(self, request: RESTRequest) -> Dict[str, Any]:
@@ -103,7 +102,7 @@ class BackpackAuth(AuthBase):
         :return: a dictionary with the sorted parameters
         """
         params = request.params or {}
-        body = request.body or {}
+        body = request.data or {}
         params.update(body)
         sorted_params = OrderedDict(sorted(params.items(), key=lambda x: x[0]))
         return dict(sorted_params)

@@ -513,13 +513,11 @@ class BackpackExchange(ExchangePyBase):
         local_asset_names = set(self._account_balances.keys())
         remote_asset_names = set()
 
-        account_info = await self._api_get(path_url=CONSTANTS.ACCOUNTS_PATH_URL, is_auth_required=True)
+        balances = await self._api_get(path_url=CONSTANTS.ACCOUNTS_PATH_URL, is_auth_required=True)
 
-        balances = account_info["balances"]
-        for balance_entry in balances:
-            asset_name = balance_entry["asset"]
-            free_balance = Decimal(balance_entry["free"])
-            total_balance = Decimal(balance_entry["free"]) + Decimal(balance_entry["locked"])
+        for asset_name, balance_entry in balances.items():
+            free_balance = Decimal(balance_entry["available"])
+            total_balance = Decimal(balance_entry["available"]) + Decimal(balance_entry["locked"])
             self._account_available_balances[asset_name] = free_balance
             self._account_balances[asset_name] = total_balance
             remote_asset_names.add(asset_name)
@@ -531,9 +529,9 @@ class BackpackExchange(ExchangePyBase):
 
     def _initialize_trading_pair_symbols_from_exchange_info(self, exchange_info: Dict[str, Any]):
         mapping = bidict()
-        for symbol_data in filter(backpack_utils.is_exchange_information_valid, exchange_info["symbols"]):
+        for symbol_data in filter(backpack_utils.is_symbol_information_valid, exchange_info):
             mapping[symbol_data["symbol"]] = combine_to_hb_trading_pair(
-                base=symbol_data["baseAsset"], quote=symbol_data["quoteAsset"]
+                base=symbol_data["baseSymbol"], quote=symbol_data["quoteSymbol"]
             )
         self._set_trading_pair_symbol_map(mapping)
 

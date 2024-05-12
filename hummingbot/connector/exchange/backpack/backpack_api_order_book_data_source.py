@@ -16,7 +16,6 @@ if TYPE_CHECKING:
 
 
 class BackpackAPIOrderBookDataSource(OrderBookTrackerDataSource):
-    HEARTBEAT_TIME_INTERVAL = 30.0
     TRADE_STREAM_ID = 1
     DIFF_STREAM_ID = 2
     ONE_HOUR = 60 * 60
@@ -55,7 +54,7 @@ class BackpackAPIOrderBookDataSource(OrderBookTrackerDataSource):
 
         rest_assistant = await self._api_factory.get_rest_assistant()
         data = await rest_assistant.execute_request(
-            url=web_utils.public_rest_url(path_url=CONSTANTS.SNAPSHOT_PATH_URL, domain=self._domain),
+            url=web_utils.public_rest_url(path_url=CONSTANTS.SNAPSHOT_PATH_URL),
             params=params,
             method=RESTMethod.GET,
             throttler_limit_id=CONSTANTS.SNAPSHOT_PATH_URL,
@@ -96,7 +95,8 @@ class BackpackAPIOrderBookDataSource(OrderBookTrackerDataSource):
     async def _connected_websocket_assistant(self) -> WSAssistant:
         ws: WSAssistant = await self._api_factory.get_ws_assistant()
         await ws.connect(
-            ws_url=CONSTANTS.WSS_URL.format(self._domain), ping_timeout=CONSTANTS.WS_HEARTBEAT_TIME_INTERVAL
+            ws_url=CONSTANTS.WSS_URL.format(self._domain),
+            ping_timeout=CONSTANTS.WS_HEARTBEAT_TIME_INTERVAL,
         )
         return ws
 
